@@ -101,7 +101,7 @@ async function analyzeWithGemini(
 
   const configuredModel = process.env.GEMINI_MODEL || "gemini-3.5-flash";
   const modelCandidates = Array.from(
-    new Set([configuredModel, "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-1.5-flash"])
+    new Set([configuredModel, "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview"])
   );
 
   for (const modelName of modelCandidates) {
