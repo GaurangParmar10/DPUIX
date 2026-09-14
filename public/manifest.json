@@ -1,0 +1,10 @@
+{
+  "name": "DigitalBridge",
+  "short_name": "DigitalBridge",
+  "description": "Technology Made Understandable — Digital accessibility and safety assistant for everyone.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F1C2E",
+  "theme_color": "#0F1C2E",
+  "icons": []
+}
