@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { StructuredAnalysisResponse } from "@/types/analysis";
 import { HistoryService } from "@/lib/services/HistoryService";
+import { cn, compressImageForMobile } from "@/lib/utils";
 import { analyzeScreen } from "@/lib/ai/analysisService";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -82,7 +83,8 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
     ];
 
     try {
-      const newAnalysis = await analyzeScreen(originalImage, {
+      const compressedImage = await compressImageForMobile(originalImage);
+      const newAnalysis = await analyzeScreen(compressedImage, {
         language,
         followUpQuestion: qText,
         chatHistory: updatedHistory,

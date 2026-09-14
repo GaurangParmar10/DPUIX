@@ -22,7 +22,7 @@ import {
   MessageSquare,
   Sparkles,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, compressImageForMobile } from "@/lib/utils";
 
 export interface SamplePreset {
   id: string;
@@ -103,17 +103,19 @@ export const ScreenUploadFlow: React.FC = () => {
       return;
     }
 
-    if (file.size > 15 * 1024 * 1024) {
-      setErrorMsg("That screenshot is too large. Please choose an image under 15MB.");
+    if (file.size > 25 * 1024 * 1024) {
+      setErrorMsg("That screenshot is too large. Please choose an image under 25MB.");
       setFlowState("ERROR");
       return;
     }
 
     setErrorMsg(null);
     const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setSelectedImage(dataUrl);
+    reader.onload = async () => {
+      const rawDataUrl = reader.result as string;
+      // Compress image for fast mobile upload and serverless API compatibility
+      const compressedDataUrl = await compressImageForMobile(rawDataUrl);
+      setSelectedImage(compressedDataUrl);
       setImageMeta(name || "Selected Screenshot");
       setFlowState("PREVIEW");
     };
@@ -166,13 +168,16 @@ export const ScreenUploadFlow: React.FC = () => {
     setErrorMsg(null);
 
     try {
+      // Ensure image is lightweight base64 for mobile network transfer
+      const imagePayload = await compressImageForMobile(selectedImage);
+
       const questionPayload = userQuestion.trim()
         ? userQuestion.trim()
         : imageMeta && imageMeta !== "Screenshot" && imageMeta !== "Selected Screenshot"
         ? `Screen analysis for: ${imageMeta}`
         : undefined;
 
-      const result = await analyzeScreen(selectedImage, {
+      const result = await analyzeScreen(imagePayload, {
         language,
         userQuestion: questionPayload,
       });
