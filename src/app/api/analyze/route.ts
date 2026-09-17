@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { StructuredAnalysisResponse } from "@/types/analysis";
 import { getMockAnalysis } from "@/lib/ai/mockProvider";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 const LANGUAGE_NAMES: Record<string, string> = {
   en: "English",
   hi: "Hindi (हिन्दी)",
