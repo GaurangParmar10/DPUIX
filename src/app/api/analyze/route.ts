@@ -75,9 +75,17 @@ async function analyzeWithGemini(
   userPrompt: string,
   systemPrompt: string,
   language: string
-): Promise<StructuredAnalysisResponse | null> {
-  const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!geminiApiKey || geminiApiKey.startsWith("your_")) return null;
+): Promise<{ result: StructuredAnalysisResponse | null; lastError?: string }> {
+  const rawKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY;
+
+  const geminiApiKey = (rawKey || "").trim().replace(/^["']|["']$/g, "");
+  if (!geminiApiKey || geminiApiKey.startsWith("your_")) {
+    console.warn("[DigitalBridge API] GEMINI_API_KEY is missing or unconfigured in environment variables.");
+    return { result: null, lastError: "GEMINI_API_KEY missing in environment variables" };
+  }
 
   const base64Clean = imageBase64.replace(/^data:image\/[a-zA-Z0-9\+\-\.]+;base64,/, "");
   const payload = {
@@ -104,8 +112,10 @@ async function analyzeWithGemini(
 
   const configuredModel = process.env.GEMINI_MODEL || "gemini-3.5-flash";
   const modelCandidates = Array.from(
-    new Set([configuredModel, "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview"])
+    new Set([configuredModel, "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview", "gemini-2.5-flash"])
   );
+
+  let lastError = "";
 
   for (const modelName of modelCandidates) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
@@ -129,18 +139,20 @@ async function analyzeWithGemini(
             .trim();
           const parsed: StructuredAnalysisResponse = JSON.parse(cleaned);
           console.log(`[DigitalBridge API] Successfully analyzed screenshot with Google Gemini Vision (${modelName})!`);
-          return parsed;
+          return { result: parsed };
         }
       } else {
         const errText = await res.text();
-        console.warn(`[DigitalBridge API] Gemini (${modelName}) status ${res.status}: ${errText.substring(0, 150)}`);
+        lastError = `Gemini (${modelName}) ${res.status}: ${errText.substring(0, 200)}`;
+        console.warn(`[DigitalBridge API] ${lastError}`);
       }
-    } catch (err) {
-      console.warn(`[DigitalBridge API] Gemini (${modelName}) error:`, err);
+    } catch (err: any) {
+      lastError = `Gemini (${modelName}) fetch error: ${err?.message || String(err)}`;
+      console.warn(`[DigitalBridge API] ${lastError}`);
     }
   }
 
-  return null;
+  return { result: null, lastError };
 }
 
 /**
@@ -373,7 +385,13 @@ export async function POST(req: NextRequest) {
     // =========================================================================
 
     // Try Google Gemini (100% Free Tier)
-    const geminiResult = await analyzeWithGemini(image, mimeType, userPromptText, systemPrompt, language);
+    const { result: geminiResult, lastError: geminiError } = await analyzeWithGemini(
+      image,
+      mimeType,
+      userPromptText,
+      systemPrompt,
+      language
+    );
     if (geminiResult) {
       if (activeQuestion) geminiResult.userQuestion = activeQuestion;
       if (chatHistory) geminiResult.chatHistory = chatHistory;
@@ -397,12 +415,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Fallback: Smart Multimodal Intelligence Engine (100% Free & Guarantees smooth response)
-    console.log("[DigitalBridge API] No external API key found or providers unreachable. Using Smart Vision Intelligence Engine.");
+    console.log(`[DigitalBridge API] Fallback triggered. Gemini error: ${geminiError || "None"}`);
     const mockResult = getMockAnalysis(image, {
       language,
       userQuestion: activeQuestion,
       chatHistory,
     });
+
+    if (geminiError) {
+      mockResult.serviceNotice = `[Vercel Diagnosis] Gemini API provider did not respond: ${geminiError}`;
+    }
 
     return NextResponse.json(mockResult);
   } catch (error) {
